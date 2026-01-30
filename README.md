@@ -100,4 +100,9 @@ _rich-davs_
 
 *Skolnik, M. I., Radar Handbook, 3rd ed., McGraw-Hill, 2008.*
 
+### License
+
+Licensed under either of Apache-2.0 or MIT, at your option.
+
+
 
