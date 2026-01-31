@@ -42,13 +42,9 @@ $$
 
 ## Usage
 
-This program is primarily designed for the aviation community and as such utilises industry standard units for entry. the default units for entry are:
+This program is primarily designed for the aviation community but can accept inputs for height in both meters and feet for the radar and the target elevation above ground level (AGL).
 
-- Antenna (Radar) AGL = Meters
-- Target (Aircraft) AGL = Feet
-- LOS Range = Nautical Miles
-
-Nautical miles is returned as an integer value rounded down for display, all maths is computed using 64-bit floating point values utilising SI units.
+Units can be defines when calling the program using arguments however the interactive shell mode will default to height in meters for the radar and feet for the target, aligning with aviation norms.
 
 ### Installation
 
@@ -79,15 +75,15 @@ this will prompt users to input Hr and Ht in the terminal before providing an an
 
 Utilising arguments the format is:
 ```
-detect-range --hr {radar height} --ht {target height}
+detect-range --hr {radar height} --hru {radar height unit "m" or "ft" only} --ht {target height} --htu {target height unit "m" or "ft" only} 
 ```
-Both variables hr and ht must be provided to receive as a result.
+All four variables must be provided to receive a result.
 
 ## Future Improvements
 
 A number of planned future improvements will hopefully implemented:
 
-- Take variable input unit types (meters/feet)
+- ~~Take variable input unit types (meters/feet)~~ _Completed at V0.1.1_
 - Compare solution against a Digital Terrain Elevation model in a fixed location to determine true LoS calculations, enabling overlays on maps or data based outputs
 
 As my first ever public programme I very much appreciate any feedback on my Rust as I continue to learn and develop, please leave comments for improvements and I will explore further features as my knowledge builds.

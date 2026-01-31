@@ -9,10 +9,11 @@
 use clap::Parser;
 use owo_colors::OwoColorize;
 use std::io;
+mod helpers;
+use crate::helpers::*;
 
 const EARTH_RADIUS: f64 = 6371008.7714;
 const K_FACTOR: f64 = 4.0 / 3.0;
-const NM_CONVERSION_FACTOR: f64 = 1852.0;
 const FEET_TO_METERS: f64 = 0.3048;
 
 #[derive(Parser)]
@@ -21,54 +22,76 @@ const FEET_TO_METERS: f64 = 0.3048;
      version,
      author,
      about,
-     group(
-        clap::ArgGroup::new("cli_mode")
-        .required(false)
-        .multiple(true)
-        .requires_all(["hr", "ht"])
-     ),
-    after_help = "Operation:\n detect-range     Run in interactive mode\n detect-range --hr <meters> --ht <ft>      Run in CLI mode")]
+    after_help = "Operation:\n detect-range     Run in interactive mode\n detect-range --hr <height of radar> --hru <unit m/ft> --ht <height of target> --htu <unit m/ft>      Run in CLI mode")]
 struct Cli {
     #[arg(
         long,
-        short = 'r',
-        value_name = "HEIGHT_RADAR_METERS",
-        group = "cli_mode"
+        value_name = "HEIGHT_RADAR",
+        group = "cli_mode",
+        requires = "hru"
     )]
     /// Height of Radar in Meters (AGL)
     hr: Option<f64>,
 
+    #[arg(long, value_name = "HEIGHT_RADAR_UNIT", group = "cli_mode")]
+    /// Radar Input Unit (AGL)
+    hru: Option<InputUnit>,
+
     #[arg(
         long,
         short = 't',
-        value_name = "HEIGHT_TARGET_FEET",
-        group = "cli_mode"
+        value_name = "HEIGHT_TARGET",
+        group = "cli_mode",
+        requires = "htu"
     )]
     /// Height of Target in feet (AGL)
     ht: Option<f64>,
+
+    #[arg(long, value_name = "HEIGHT_TARGET_UNIT", group = "cli_mode")]
+    /// Target Input Unit
+    htu: Option<InputUnit>,
 }
 
 fn main() {
     let args = Cli::parse();
 
-    if args.hr.is_none() && args.ht.is_none() {
-        welcome();
-        let hr: f64 = user_input_radar();
-        let ht: f64 = user_input_tgt();
-        let range: u64 = radar_horizon(hr, ht) as u64;
-        println!(
-            "Target will be detected at {range} NM from Radar",
-            range = range.to_string().green()
-        );
-    } else {
-        let hr: f64 = args.hr.unwrap();
-        let ht: f64 = args.ht.unwrap() * FEET_TO_METERS;
-        let range: u64 = radar_horizon(hr, ht) as u64;
-        println!(
-            "Target will be detected at {range} NM from Radar",
-            range = range.to_string().green()
-        );
+    match (args.hr, args.hru, args.ht, args.htu) {
+        (None, None, None, None) => {
+            interactive_mode_flow();
+        }
+
+        (Some(hr), Some(hru), Some(ht), Some(htu)) => {
+            let hrm = if hru == InputUnit::Ft {
+                input_ft_to_meters(hr)
+            } else {
+                hr
+            };
+            let htm = if htu == InputUnit::Ft {
+                input_ft_to_meters(ht)
+            } else {
+                ht
+            };
+            let result_meters: f64 = radar_horizon(hrm, htm);
+            let output: OutputUnit = unit_converter(result_meters);
+            println!("The target will be detected at: ");
+            println!("{} NM", format!("{:.2}", output.nm).green());
+            println!("{} KM", format!("{:.2}", output.km).green());
+        }
+        _ => {
+            std::process::exit(2);
+        }
     }
+}
+
+fn interactive_mode_flow() {
+    welcome();
+    let hrm: f64 = user_input_radar();
+    let htm: f64 = user_input_tgt();
+    let result_meters: f64 = radar_horizon(hrm, htm);
+    let output: OutputUnit = unit_converter(result_meters);
+    println!("The target will be detected at: ");
+    println!("{} NM", format!("{:.2}", output.nm).green());
+    println!("{} KM", format!("{:.2}", output.km).green());
 }
 
 fn welcome() {
@@ -107,14 +130,12 @@ fn user_input_tgt() -> f64 {
     }
 }
 
-fn radar_horizon(hr: f64, ht: f64) -> f64 {
-    let hr_calc: f64 = 2.0 * (EARTH_RADIUS * K_FACTOR) * hr;
-    let ht_calc: f64 = 2.0 * (EARTH_RADIUS * K_FACTOR) * ht;
+fn radar_horizon(hrm: f64, htm: f64) -> f64 {
+    let hr_calc: f64 = 2.0 * (EARTH_RADIUS * K_FACTOR) * hrm;
+    let ht_calc: f64 = 2.0 * (EARTH_RADIUS * K_FACTOR) * htm;
 
     let root_hr: f64 = (hr_calc).sqrt();
     let root_ht: f64 = (ht_calc).sqrt();
 
-    let answer: f64 = (root_hr + root_ht) / NM_CONVERSION_FACTOR;
-
-    answer
+    root_hr + root_ht
 }
