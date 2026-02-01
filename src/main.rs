@@ -6,126 +6,31 @@
 //! Radar Detection line-of-sight calculator utilising the
 //! effective Earth radius / k-factor model commonly used in Radar Engineering.
 
-use clap::Parser;
-use owo_colors::OwoColorize;
-use std::io;
+mod cli;
+mod graph;
 mod helpers;
+use crate::cli::*;
+use crate::graph::*;
 use crate::helpers::*;
+use clap::Parser;
 
-const EARTH_RADIUS: f64 = 6371008.7714;
-const K_FACTOR: f64 = 4.0 / 3.0;
-const FEET_TO_METERS: f64 = 0.3048;
-
-#[derive(Parser)]
-#[command(
-    name = "detect-range",
-     version,
-     author,
-     about,
-    after_help = "Operation:\n detect-range     Run in interactive mode\n detect-range --hr <height of radar> --hru <unit m/ft> --ht <height of target> --htu <unit m/ft>      Run in CLI mode")]
-struct Cli {
-    #[arg(
-        long,
-        value_name = "HEIGHT_RADAR",
-        group = "cli_mode",
-        requires = "hru"
-    )]
-    /// Height of Radar in Meters (AGL)
-    hr: Option<f64>,
-
-    #[arg(long, value_name = "HEIGHT_RADAR_UNIT", group = "cli_mode")]
-    /// Radar Input Unit (AGL)
-    hru: Option<InputUnit>,
-
-    #[arg(
-        long,
-        short = 't',
-        value_name = "HEIGHT_TARGET",
-        group = "cli_mode",
-        requires = "htu"
-    )]
-    /// Height of Target in feet (AGL)
-    ht: Option<f64>,
-
-    #[arg(long, value_name = "HEIGHT_TARGET_UNIT", group = "cli_mode")]
-    /// Target Input Unit
-    htu: Option<InputUnit>,
-}
+use serde_json::json;
 
 fn main() {
     let args = Cli::parse();
 
-    match (args.hr, args.hru, args.ht, args.htu) {
-        (None, None, None, None) => {
-            interactive_mode_flow();
-        }
-
-        (Some(hr), Some(hru), Some(ht), Some(htu)) => {
-            let hrm = if hru == InputUnit::Ft {
-                input_ft_to_meters(hr)
-            } else {
-                hr
-            };
-            let htm = if htu == InputUnit::Ft {
-                input_ft_to_meters(ht)
-            } else {
-                ht
-            };
-            let result_meters: f64 = radar_horizon(hrm, htm);
+    match args.command {
+        Commands::Calc(calc) => {
+            let hrm = resolve_input_m(calc.hr, calc.hru);
+            let htm = resolve_input_m(calc.ht, calc.htu);
+            let result_meters = radar_horizon(hrm, htm);
             let output: OutputUnit = unit_converter(result_meters);
-            println!("The target will be detected at: ");
-            println!("{} NM", format!("{:.2}", output.nm).green());
-            println!("{} KM", format!("{:.2}", output.km).green());
+            calc_json_output(calc.hr, calc.hru, calc.ht, calc.htu, hrm, htm, output);
         }
-        _ => {
-            std::process::exit(2);
-        }
-    }
-}
-
-fn interactive_mode_flow() {
-    welcome();
-    let hrm: f64 = user_input_radar();
-    let htm: f64 = user_input_tgt();
-    let result_meters: f64 = radar_horizon(hrm, htm);
-    let output: OutputUnit = unit_converter(result_meters);
-    println!("The target will be detected at: ");
-    println!("{} NM", format!("{:.2}", output.nm).green());
-    println!("{} KM", format!("{:.2}", output.km).green());
-}
-
-fn welcome() {
-    println!("\n");
-    println!("Welcome to the Radar Horizon Tool\n");
-    println!("Enter Radar Antenna Height and Target Aircraft Height to Assess Detection Range\n")
-}
-
-fn user_input_radar() -> f64 {
-    loop {
-        println!("Input Radar Antenna Height (AGL) in meters: ");
-        let mut input: String = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read input.");
-
-        match input.trim().parse::<f64>() {
-            Ok(f64) => return f64,
-            Err(_) => println!("Invalid please enter a number only e.g 250"),
-        }
-    }
-}
-
-fn user_input_tgt() -> f64 {
-    loop {
-        println!("Input Aircraft Height in ft (AGL):");
-        let mut input: String = String::new();
-        io::stdin()
-            .read_line(&mut input)
-            .expect("Failed to read input.");
-
-        match input.trim().parse::<f64>() {
-            Ok(f64) => return f64 * FEET_TO_METERS,
-            Err(_) => println!("Invalid please enter a whole number e.g 250"),
+        Commands::Graph(graph) => {
+            let hrm = resolve_input_m(graph.hr, graph.hru);
+            let plot_points: Vec<PlotPoint> = graph_ft(hrm);
+            graph_json_output(graph.hr, graph.hru, plot_points)
         }
     }
 }
@@ -138,4 +43,36 @@ fn radar_horizon(hrm: f64, htm: f64) -> f64 {
     let root_ht: f64 = (ht_calc).sqrt();
 
     root_hr + root_ht
+}
+
+fn calc_json_output(
+    hr: f64,
+    hru: InputUnit,
+    ht: f64,
+    htu: InputUnit,
+    hrm: f64,
+    htm: f64,
+    output: OutputUnit,
+) {
+    let payload = json!({
+    "input": {
+        "radar_height": { "value": hr, "unit": hru },
+        "target_height": { "value": ht, "unit": htu },
+        "normalized" : { "radar_height_m": hrm, "target_height_m": htm},
+    },
+    "result": {
+        "detection_range": output,
+    },
+    });
+    println!("{}", serde_json::to_string_pretty(&payload).unwrap());
+}
+
+fn graph_json_output(hr: f64, hru: InputUnit, plot_points: Vec<PlotPoint>) {
+    let payload = json!({
+    "input": {
+        "radar_height": { "value": hr, "unit": hru },
+    },
+    "graph_data": plot_points,
+    });
+    println!("{}", serde_json::to_string_pretty(&payload).unwrap());
 }

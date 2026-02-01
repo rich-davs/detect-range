@@ -1,6 +1,16 @@
 # Detect Range
 
-## About
+## Introduction
+
+Calculating how far and at what altitude a target can be seen from a Radar is useful for a number of applications, this tool will allow you to calculate and display the max range and altitude that a target will be within the effective Line of Sight (LoS) of a given Radar. It currently takes no account of Radar power or performance, or terrain elevation - although these features are planned. It does factor in the curvature of the Earth and refraction of the waves.
+
+The near term roadmap for this software includes introducing:
+
+- Global DTED comparison - taking into account the actual elevation of the ground and plotting based on a location of a Radar.
+- Enabling cross platform integration with bindings for various back and front ends to utilise this tool outside of the Rust environment.
+
+
+## Method
 
 Detect Range employs the radar line-of-sight (LOS) range equation using the effective Earth
 radius (k-factor) model. This model is widely used in radio-frequency (RF) engineering to
@@ -65,25 +75,30 @@ target/release/detect-range
 
 ### Commands
 
-To initiate the program in interactive terminal mode:
+The program runs in the CLI using arguments. There are two modes:
 
-```
-detect-range
-```
+- Calculation - Runs a singles calculation
+- Graph - Returns a JSON with range (Nm) and altitude (ft) for 0-65,000ft targets in order to show a horizon graph for a given target altitude.
 
-this will prompt users to input Hr and Ht in the terminal before providing an answer.
-
-Utilising arguments the format is:
+Calculation format is:
 ```
-detect-range --hr {radar height} --hru {radar height unit "m" or "ft" only} --ht {target height} --htu {target height unit "m" or "ft" only} 
+detect-range calc --hr {radar height} --hru {radar height unit "m" or "ft" only} --ht {target height} --htu {target height unit "m" or "ft" only} 
 ```
 All four variables must be provided to receive a result.
+
+Graph format is:
+```
+detect-range graph --hr {radar height} --hru {radar height unit "m" or "ft" only} 
+```
+Both variables must be provided to receive a result.
+
 
 ## Future Improvements
 
 A number of planned future improvements will hopefully implemented:
 
 - ~~Take variable input unit types (meters/feet)~~ _Completed at V0.1.1_
+- ~~Provide graphical plot return data~~_Completed at V0.1.2_
 - Compare solution against a Digital Terrain Elevation model in a fixed location to determine true LoS calculations, enabling overlays on maps or data based outputs
 
 As my first ever public programme I very much appreciate any feedback on my Rust as I continue to learn and develop, please leave comments for improvements and I will explore further features as my knowledge builds.
